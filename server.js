@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import bodyParser from "body-parser";
-import { handleRAGChat } from "./ragService.js"; // your existing chat logic
+import { chatting } from "./ragService.js"; // your existing chat logic
 
 dotenv.config();
 
@@ -37,7 +37,7 @@ app.post("/api/chat", async (req, res) => {
       return res.status(400).json({ error: "Message is required." });
     }
 
-    const response = await handleRAGChat(message);
+    const response = await chatting(message);
     res.json({ reply: response });
   } catch (err) {
     console.error("❌ Chat API error:", err);
