@@ -1,61 +1,60 @@
-import express from 'express';
-import cors from 'cors';
-import * as dotenv from 'dotenv';
-import { chatting } from './ragService.js';
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+import bodyParser from "body-parser";
+import { handleRAGChat } from "./ragService.js"; // your existing chat logic
 
 dotenv.config();
+
 const app = express();
-const PORT = process.env.PORT || 5000;
 
-// Middleware
+// ✅ Allow frontend (Vercel) + local dev
+const allowedOrigin =
+  process.env.ALLOWED_ORIGIN || "http://localhost:5000";
+
+app.use(
+  cors({
+    origin: allowedOrigin,
+    methods: ["GET", "POST", "OPTIONS"],
+    credentials: true,
+  })
+);
+
 app.use(express.json());
-app.use(cors({
-  origin: process.env.ALLOWED_ORIGIN || "*", // you’ll update this to your Vercel frontend later
-}));
+app.use(bodyParser.json());
 
-// Health check
-app.get('/health', (req, res) => {
-  res.json({
-    status: 'OK',
-    message: 'Argo Float Chatbot backend running',
-    time: new Date().toISOString()
-  });
+// ✅ Health check route
+app.get("/", (req, res) => {
+  res.send("✅ Argo Float Chatbot Backend is running!");
 });
 
-// Chat endpoint
-app.post('/api/chat', async (req, res) => {
+// ✅ Chat route for RAG chatbot
+app.post("/api/chat", async (req, res) => {
   try {
-    const { question } = req.body;
-    if (!question?.trim()) {
-      return res.status(400).json({ error: 'Missing question' });
+    const { message } = req.body;
+
+    if (!message) {
+      return res.status(400).json({ error: "Message is required." });
     }
 
-    console.log('Incoming question:', question);
-    const answer = await chatting(question.trim());
-    return res.json({ answer });
-
+    const response = await handleRAGChat(message);
+    res.json({ reply: response });
   } catch (err) {
-    console.error('Error in /api/chat:', err);
-    return res.status(500).json({
-      error: 'Internal server error',
-      answer: 'I encountered an issue processing your question.'
-    });
+    console.error("❌ Chat API error:", err);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
-// 404
-app.use((req, res) => res.status(404).json({
-  error: 'Not found',
-  message: 'Endpoint does not exist.'
-}));
+// ✅ Global error handler
+app.use((err, req, res, next) => {
+  console.error("Global error:", err);
+  res.status(500).json({ error: "Something went wrong!" });
+});
+
+// ✅ Port setup (for Railway or local)
+const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
-  console.log('Environment check:');
-  [
-    'GEMINI_API_KEY',
-    'PINECONE_API_KEY',
-    'PINECONE_INDEX_NAME',
-    'DATABASE_URL'
-  ].forEach(v => console.log(`- ${v}:`, process.env[v] ? '✅ Set' : '❌ Missing'));
+  console.log(`🌐 Allowed origin: ${allowedOrigin}`);
 });
